@@ -1,0 +1,680 @@
+#PERSISTENT HEALTHY STATE
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.integrate import solve_ivp
+
+# Define parameters
+G = 0.001
+C = 1000
+A_init = 0.5
+R_init = 0.5
+D = 0.15
+B = 0.1
+Sigma = 0.15
+
+# Define the system of differential equations
+def system(t, y):
+    A, R = y
+    dA_dt = 1 + G * A**2 * (1 - A / C) - A * R + np.sqrt(2 * Sigma) * np.random.normal()
+    dR_dt = D * (1 - R) + B * A * R
+    return [dA_dt, dR_dt]
+
+# Time span
+t_span = (0, 200)
+t_eval = np.linspace(*t_span, 1000)
+
+# Solve the system
+sol = solve_ivp(system, t_span, [A_init, R_init], t_eval=t_eval, method='RK45')
+
+# Compute Symptom as a binary variable
+A_values = sol.y[0]
+Symptom = (A_values > 100).astype(int)
+
+# Plot A, R, and Symptom in separate subplots
+fig, axes = plt.subplots(3, 1, figsize=(10, 10), sharex=True)
+
+# A(t)
+axes[0].plot(sol.t, A_values, color='blue')
+axes[0].set_ylabel('Autoreactive T cells (AU)')
+axes[0].set_title('Dynamics of A(t)')
+axes[0].legend()
+
+# R(t)
+axes[1].plot(sol.t, sol.y[1], color='red')
+axes[1].set_ylabel('Regulatory T cells (AU)')
+axes[1].set_title('Dynamics of R(t)')
+axes[1].legend()
+
+# Symptom(t)
+axes[2].step(sol.t, Symptom, color='green')
+axes[2].set_xlabel('Time (AU)')
+axes[2].set_ylabel('Symptom')
+axes[2].set_title('Symptom versus Time')
+axes[2].legend()
+
+plt.tight_layout()
+plt.show()
+
+
+
+
+
+
+
+#OSCILLATIONS
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.integrate import solve_ivp
+
+# ----------------------------------
+# Parameters for True Oscillations
+# ----------------------------------
+G = 1.5
+C = 1000
+D = 0.1
+B = 0.02
+A_clip = 1500  # Upper limit on A to avoid blow-up
+
+# System definition (no noise)
+def system(t, y):
+    A, R = y
+    dA_dt = 1 + G * A**2 * (1 - A / C) - A * R
+    dR_dt = D * (1 - R) + B * A * R
+    return np.array([dA_dt, dR_dt])
+
+# ----------------------------------
+# Phase Portrait with Trajectory
+# ----------------------------------
+A_vals = np.linspace(0, 1200, 30)
+R_vals = np.linspace(0, 200, 30)
+A_grid, R_grid = np.meshgrid(A_vals, R_vals)
+
+dA_dt = np.zeros_like(A_grid)
+dR_dt = np.zeros_like(R_grid)
+
+for i in range(A_grid.shape[0]):
+    for j in range(A_grid.shape[1]):
+        dA, dR = system(0, [A_grid[i, j], R_grid[i, j]])
+        dA_dt[i, j] = dA
+        dR_dt[i, j] = dR
+
+# Solve a trajectory from initial condition
+sol = solve_ivp(system, [0, 250], [1.0, 1.0], t_eval=np.linspace(0, 250, 1000))
+
+# Plot phase portrait
+plt.figure(figsize=(10, 6))
+plt.quiver(A_grid, R_grid, dA_dt, dR_dt, angles='xy', scale=300, pivot='mid', color='gray')
+plt.plot(sol.y[0], sol.y[1], 'b-', label='Trajectory')
+plt.xlabel('Autoreactive T cells (A)')
+plt.ylabel('Regulatory T cells (R)')
+plt.title('Phase Portrait with Limit Cycle Trajectory')
+plt.legend()
+plt.grid()
+plt.show()
+
+# ----------------------------------
+# Time Simulation (Clean Oscillations)
+# ----------------------------------
+T = 250
+dt = 0.1
+steps = int(T / dt)
+t = np.linspace(0, T, steps)
+
+A = 1.0
+R = 1.0
+A_traj = []
+R_traj = []
+symptom = []
+
+for _ in range(steps):
+    dA = 1 + G * A**2 * (1 - A / C) - A * R
+    dR = D * (1 - R) + B * A * R
+
+    A += dA * dt
+    R += dR * dt
+
+    # Clip runaway A values
+    A = max(0, min(A, A_clip))
+    R = max(R, 0)
+
+    A_traj.append(A)
+    R_traj.append(R)
+    symptom.append(1 if A > 700 else 0)
+
+# ----------------------------------
+# Plot Time Series
+# ----------------------------------
+plt.figure(figsize=(10, 8))
+
+plt.subplot(3, 1, 1)
+plt.plot(t, A_traj, color='blue')
+plt.title('Dynamics of A(t)')
+plt.ylabel('Autoreactive T cells (A)')
+
+plt.subplot(3, 1, 2)
+plt.plot(t, R_traj, color='red')
+plt.title('Dynamics of R(t)')
+plt.ylabel('Regulatory T cells (R)')
+
+plt.subplot(3, 1, 3)
+plt.plot(t, symptom, color='green')
+plt.title('Symptom versus Time')
+plt.xlabel('Time (AU)')
+plt.ylabel('Symptoms')
+
+plt.tight_layout()
+plt.show()
+
+
+
+
+
+
+
+#FLARE UPS
+import numpy as np
+import matplotlib.pyplot as plt
+# ---------------------------
+# Phase Portrait
+# ---------------------------
+
+# Parameters
+G = 2.5
+C = 1000
+D = 0.15
+B = 0.005
+
+# Define system (no noise!)
+def system(t, y):
+    A, R = y
+    dA_dt = 1 + G * A**2 * (1 - A / C) - A * R
+    dR_dt = D * (1 - R) + B * A * R
+    return np.array([dA_dt, dR_dt])
+
+# Grid for phase plane
+A_vals = np.linspace(0, 200, 20)
+R_vals = np.linspace(0, 2, 20)
+A, R = np.meshgrid(A_vals, R_vals)
+
+dA_dt, dR_dt = np.zeros(A.shape), np.zeros(R.shape)
+
+# Compute vector field
+for i in range(A.shape[0]):
+    for j in range(A.shape[1]):
+        dA_dt[i, j], dR_dt[i, j] = system(0, [A[i, j], R[i, j]])
+
+# Normalize arrows for better visualization
+magnitude = np.sqrt(dA_dt**2 + dR_dt**2)
+dA_dt /= magnitude
+dR_dt /= magnitude
+
+# Plot vector field
+plt.figure(figsize=(10, 6))
+plt.quiver(A, R, dA_dt, dR_dt, angles='xy')
+plt.xlabel('Autoreactive T cells (A)')
+plt.ylabel('Regulatory T cells (R)')
+plt.title('Phase Portrait of the Immune Model')
+plt.grid()
+plt.show()
+
+# ---------------------------
+# Flare-Up Dynamics Over Time
+# ---------------------------
+
+np.random.seed(42)  # For reproducibility
+
+# Time setup
+T = 500
+dt = 0.1
+steps = int(T / dt)
+t = np.linspace(0, T, steps)
+
+# Initialize variables
+A = 1.0
+R = 1.0
+A_traj = []
+R_traj = []
+symptom = []
+
+# Simulate with noise
+for _ in range(steps):
+    noise = np.random.normal(0, 0.5)
+    dA = 1 + G * A**2 * (1 - A / C) - A * R + noise
+    dR = D * (1 - R) + B * A * R
+
+    A += dA * dt
+    R += dR * dt
+
+    # Clamp to avoid negative values
+    A = max(A, 0)
+    R = max(R, 0)
+
+    A_traj.append(A)
+    R_traj.append(R)
+    symptom.append(1 if A > 700 else 0)
+
+# Plot time dynamics
+plt.figure(figsize=(10, 8))
+
+plt.subplot(3, 1, 1)
+plt.plot(t, A_traj, color='blue')
+plt.title('Dynamics of A(t)')
+plt.ylabel('Autoreactive T cells (A)')
+
+plt.subplot(3, 1, 2)
+plt.plot(t, R_traj, color='red')
+plt.title('Dynamics of R(t)')
+plt.ylabel('Regulatory T cells (R)')
+
+plt.subplot(3, 1, 3)
+plt.plot(t, symptom, color='green')
+plt.title('Symptom versus Time')
+plt.xlabel('Time (AU)')
+plt.ylabel('Symptoms')
+
+plt.tight_layout()
+plt.show()
+
+
+
+
+
+
+
+#PERSISTENT SICK STATE
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.integrate import solve_ivp
+
+# Define parameters
+G = 2
+C = 1000
+A_init = 0.5
+R_init = 0.5
+D = 0.15
+B = 0.00001
+Sigma = 0.15
+
+# Define the system of differential equations
+def system(t, y):
+    A, R = y
+    dA_dt = 1 + G * A**2 * (1 - A / C) - A * R + np.sqrt(2 * Sigma) * np.random.normal()
+    dR_dt = D * (1 - R) + B * A * R
+    return [dA_dt, dR_dt]
+
+# Time span
+t_span = (0, 200)
+t_eval = np.linspace(*t_span, 1000)
+
+# Solve the system
+sol = solve_ivp(system, t_span, [A_init, R_init], t_eval=t_eval, method='RK45')
+
+# Compute Symptom as a binary variable
+A_values = sol.y[0]
+Symptom = (A_values > 100).astype(int)
+
+# Plot A, R, and Symptom in separate subplots
+fig, axes = plt.subplots(3, 1, figsize=(10, 10), sharex=True)
+
+# A(t)
+axes[0].plot(sol.t, A_values, color='blue')
+axes[0].set_ylabel('Autoreactive T cells (AU)')
+axes[0].set_title('Dynamics of A(t)')
+axes[0].legend()
+
+# R(t)
+axes[1].plot(sol.t, sol.y[1], color='red')
+axes[1].set_ylabel('Regulatory T cells (AU)')
+axes[1].set_title('Dynamics of R(t)')
+axes[1].legend()
+
+# Symptom(t)
+axes[2].step(sol.t, Symptom, color='green')
+axes[2].set_xlabel('Time (AU)')
+axes[2].set_ylabel('Symptom')
+axes[2].set_title('Symptom versus Time')
+axes[2].legend()
+
+plt.tight_layout()
+plt.show()
+
+
+
+
+
+
+
+#PERSISTENT HEALTHY STATE
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.integrate import solve_ivp
+
+# Parameters
+G = 0.1
+C = 1000
+D = 0.15
+B = 0.001
+Sigma = 0.15
+
+# Dynamical system
+def system(t, y):
+    A, R = y
+    dA_dt = 1 + G * A**2 * (1 - A / C) - A * R+ np.sqrt(2 * Sigma) * np.random.normal()
+    dR_dt = D * (1 - R) + B * A * R
+    return [dA_dt, dR_dt]
+
+# Grid for vector field
+A_vals = np.linspace(1, 1000, 40)
+R_vals = np.linspace(0, 400, 40)
+A, R = np.meshgrid(A_vals, R_vals)
+
+dA = 1 + G * A**2 * (1 - A / C) - A * R
+dR = D * (1 - R) + B * A * R
+speed = np.sqrt(dA**2 + dR**2)  # For normalizing arrows
+
+# Nullclines
+A_dense = np.linspace(1e-2, 1000, 2000)
+# dA/dt = 0  -> R_A
+R_A = (1 / A_dense) + G * A_dense - (G / C) * A_dense**2
+
+# dR/dt = 0  -> R_R
+# Careful with vertical asymptote at A = D/B = 150
+R_R = D / (D - B * A_dense)
+
+# Trajectory initial condition
+y0 = [200, 5]
+t_span = (0, 200)
+sol = solve_ivp(system, t_span, y0, t_eval=np.linspace(*t_span, 2000))
+
+# Plotting
+plt.figure(figsize=(8, 6))
+
+# Vector field
+plt.streamplot(A, R, dA/speed, dR/speed, density=2, linewidth=1, arrowsize=0.7)
+
+# Nullclines
+# A-nullcline
+mask_A = (R_A >= 0) & (R_A <= 400)
+plt.plot(A_dense[mask_A], R_A[mask_A], label='dA/dt = 0', color='red')
+
+# R-nullcline
+mask_R = (R_R >= 0) & (R_R <= 400) & np.isfinite(R_R)
+plt.plot(A_dense[mask_R], R_R[mask_R], label='dR/dt = 0', color='blue')
+
+# Vertical asymptote for R-nullcline at A=150 (if in range)
+plt.axvline(x=D/B, color='blue', linestyle='--', linewidth=0.8)
+
+# Trajectory with arrow
+plt.plot(sol.y[0], sol.y[1], color='black', lw=2.5)
+# Arrow indicating final direction
+plt.annotate('', xy=(sol.y[0][-1], sol.y[1][-1]),
+             xytext=(sol.y[0][-2], sol.y[1][-2]),
+             arrowprops=dict(arrowstyle='->', color='black'))
+
+# Aesthetics
+plt.xlim(0, 1000)
+plt.ylim(0, 30)
+plt.xlabel('A')
+plt.ylabel('R')
+plt.title('Phase Portrait with Nullclines and Sample Trajectory')
+plt.legend()
+plt.tight_layout()
+plt.show()
+
+
+
+
+
+
+
+#OSCILLATIONS (PHASE PORTRAIT)
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.integrate import solve_ivp
+
+# Parameters
+G = 0.5
+C = 1000
+D = 0.15
+B = 0.001
+Sigma = 0.15
+
+# Dynamical system
+def system(t, y):
+    A, R = y
+    dA_dt = 1 + G * A**2 * (1 - A / C) - A * R+ np.sqrt(2 * Sigma) * np.random.normal()
+    dR_dt = D * (1 - R) + B * A * R
+    return [dA_dt, dR_dt]
+
+# Grid for vector field
+A_vals = np.linspace(1, 1000, 40)
+R_vals = np.linspace(0, 400, 40)
+A, R = np.meshgrid(A_vals, R_vals)
+
+dA = 1 + G * A**2 * (1 - A / C) - A * R
+dR = D * (1 - R) + B * A * R
+speed = np.sqrt(dA**2 + dR**2)  # For normalizing arrows
+
+# Nullclines
+A_dense = np.linspace(1e-2, 1000, 2000)
+# dA/dt = 0  -> R_A
+R_A = (1 / A_dense) + G * A_dense - (G / C) * A_dense**2
+
+# dR/dt = 0  -> R_R
+# Careful with vertical asymptote at A = D/B = 150
+R_R = D / (D - B * A_dense)
+
+# Trajectory initial condition
+y0 = [200, 5]
+t_span = (0, 200)
+sol = solve_ivp(system, t_span, y0, t_eval=np.linspace(*t_span, 2000))
+
+# Plotting
+plt.figure(figsize=(8, 6))
+
+# Vector field
+plt.streamplot(A, R, dA/speed, dR/speed, density=2, linewidth=1, arrowsize=0.7)
+
+# Nullclines
+# A-nullcline
+mask_A = (R_A >= 0) & (R_A <= 400)
+plt.plot(A_dense[mask_A], R_A[mask_A], label='dA/dt = 0', color='red')
+
+# R-nullcline
+mask_R = (R_R >= 0) & (R_R <= 400) & np.isfinite(R_R)
+plt.plot(A_dense[mask_R], R_R[mask_R], label='dR/dt = 0', color='blue')
+
+# Vertical asymptote for R-nullcline at A=150 (if in range)
+plt.axvline(x=D/B, color='blue', linestyle='--', linewidth=0.8)
+
+# Trajectory with arrow
+plt.plot(sol.y[0], sol.y[1], color='black', lw=2.5)
+# Arrow indicating final direction
+plt.annotate('', xy=(sol.y[0][-1], sol.y[1][-1]),
+             xytext=(sol.y[0][-2], sol.y[1][-2]),
+             arrowprops=dict(arrowstyle='->', color='black'))
+
+# Aesthetics
+plt.xlim(0, 1000)
+plt.ylim(0, 150)
+plt.xlabel('A')
+plt.ylabel('R')
+plt.title('Phase Portrait with Nullclines and Sample Trajectory')
+plt.legend()
+plt.tight_layout()
+plt.show()
+
+
+
+
+
+
+
+#PERSISTENT SICK STATE
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.integrate import solve_ivp
+
+# Parameters
+G = 1
+C = 1000
+D = 0.15
+B = 0.0001
+Sigma = 0.15
+
+
+# Dynamical system
+def system(t, y):
+    A, R = y
+    dA_dt = 1 + G * A**2 * (1 - A / C) - A * R+ np.sqrt(2 * Sigma) * np.random.normal()
+    dR_dt = D * (1 - R) + B * A * R
+    return [dA_dt, dR_dt]
+
+# Grid for vector field
+A_vals = np.linspace(1, 1000, 40)
+R_vals = np.linspace(0, 500, 40)
+A, R = np.meshgrid(A_vals, R_vals)
+
+dA = 1 + G * A**2 * (1 - A / C) - A * R
+dR = D * (1 - R) + B * A * R
+speed = np.sqrt(dA**2 + dR**2)  # For normalizing arrows
+
+# Nullclines
+A_dense = np.linspace(1e-2, 1000, 2000)
+# dA/dt = 0  -> R_A
+R_A = (1 / A_dense) + G * A_dense - (G / C) * A_dense**2
+
+# dR/dt = 0  -> R_R
+# Careful with vertical asymptote at A = D/B = 150
+R_R = D / (D - B * A_dense)
+
+# Trajectory initial condition
+y0 = [200, 100]
+t_span = (0, 200)
+sol = solve_ivp(system, t_span, y0, t_eval=np.linspace(*t_span, 2000))
+
+# Plotting
+plt.figure(figsize=(8, 6))
+
+# Vector field
+plt.streamplot(A, R, dA/speed, dR/speed, density=1, linewidth=1, arrowsize=0.7)
+
+# Nullclines
+# A-nullcline
+mask_A = (R_A >= 0) & (R_A <= 500)
+plt.plot(A_dense[mask_A], R_A[mask_A], label='dA/dt = 0', color='red')
+
+# R-nullcline
+mask_R = (R_R >= 0) & (R_R <= 500) & np.isfinite(R_R)
+plt.plot(A_dense[mask_R], R_R[mask_R], label='dR/dt = 0', color='blue')
+
+# Vertical asymptote for R-nullcline at A=150 (if in range)
+plt.axvline(x=D/B, color='blue', linestyle='--', linewidth=0.8)
+
+# Trajectory with arrow
+plt.plot(sol.y[0], sol.y[1], color='black', lw=2.5)
+# Arrow indicating final direction
+plt.annotate('', xy=(sol.y[0][-1], sol.y[1][-1]),
+             xytext=(sol.y[0][-2], sol.y[1][-2]),
+             arrowprops=dict(arrowstyle='->', color='black'))
+
+# Aesthetics
+plt.xlim(0, 1000)
+plt.ylim(0, 250)
+plt.xlabel('A')
+plt.ylabel('R')
+plt.title('Phase Portrait with Nullclines and Sample Trajectory')
+plt.legend()
+plt.tight_layout()
+plt.show()
+
+
+
+
+
+
+
+#FLARE UPS (PHASE PORTRAIT)
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.integrate import solve_ivp
+
+# Parameters
+G = 2.5
+C = 1000
+D = 0.15
+B = 0.005
+Sigma = 0.15
+
+
+# Dynamical system
+def system(t, y):
+    A, R = y
+    dA_dt = 1 + G * A**2 * (1 - A / C) - A * R+ np.sqrt(2 * Sigma) * np.random.normal()
+    dR_dt = D * (1 - R) + B * A * R
+    return [dA_dt, dR_dt]
+
+# Grid for vector field
+A_vals = np.linspace(1, 1000, 40)
+R_vals = np.linspace(0, 700, 40)
+A, R = np.meshgrid(A_vals, R_vals)
+
+dA = 1 + G * A**2 * (1 - A / C) - A * R
+dR = D * (1 - R) + B * A * R
+speed = np.sqrt(dA**2 + dR**2)  # For normalizing arrows
+
+# Nullclines
+A_dense = np.linspace(1e-2, 1000, 2000)
+# dA/dt = 0  -> R_A
+R_A = (1 / A_dense) + G * A_dense - (G / C) * A_dense**2
+
+# dR/dt = 0  -> R_R
+# Careful with vertical asymptote at A = D/B = 150
+R_R = D / (D - B * A_dense)
+
+# Trajectory initial condition
+y0 = [200, 100]
+t_span = (0, 100)
+sol = solve_ivp(system, t_span, y0, t_eval=np.linspace(*t_span, 2000))
+
+# Plotting
+plt.figure(figsize=(8, 6))
+
+# Vector field
+plt.streamplot(A, R, dA/speed, dR/speed, density=1, linewidth=1, arrowsize=0.7)
+
+# Nullclines
+# A-nullcline
+mask_A = (R_A >= 0) & (R_A <= 700)
+plt.plot(A_dense[mask_A], R_A[mask_A], label='dA/dt = 0', color='red')
+
+# R-nullcline
+mask_R = (R_R >= 0) & (R_R <= 700) & np.isfinite(R_R)
+plt.plot(A_dense[mask_R], R_R[mask_R], label='dR/dt = 0', color='blue')
+
+# Vertical asymptote for R-nullcline at A=150 (if in range)
+plt.axvline(x=D/B, color='blue', linestyle='--', linewidth=0.8)
+
+# Trajectory with arrow
+plt.plot(sol.y[0], sol.y[1], color='black', lw=2.5)
+# Arrow indicating final direction
+plt.annotate('', xy=(sol.y[0][-1], sol.y[1][-1]),
+             xytext=(sol.y[0][-2], sol.y[1][-2]),
+             arrowprops=dict(arrowstyle='->', color='black'))
+
+# Aesthetics
+plt.xlim(0, 1000)
+plt.ylim(0, 700)
+plt.xlabel('A')
+plt.ylabel('R')
+plt.title('Phase Portrait with Nullclines and Sample Trajectory')
+plt.legend()
+plt.tight_layout()
+plt.show()
+
+
+
+
+
+
+
