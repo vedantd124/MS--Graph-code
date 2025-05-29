@@ -54,7 +54,7 @@ axes[2].legend()
 
 plt.tight_layout()
 plt.show()
-
+_______________________________________________________
 
 
 
@@ -164,7 +164,7 @@ plt.ylabel('Symptoms')
 
 plt.tight_layout()
 plt.show()
-
+_______________________________________________________
 
 
 
@@ -274,7 +274,7 @@ plt.ylabel('Symptoms')
 
 plt.tight_layout()
 plt.show()
-
+_______________________________________________________
 
 
 
@@ -337,7 +337,7 @@ axes[2].legend()
 
 plt.tight_layout()
 plt.show()
-
+_______________________________________________________
 
 
 
@@ -420,7 +420,7 @@ plt.title('Phase Portrait with Nullclines and Sample Trajectory')
 plt.legend()
 plt.tight_layout()
 plt.show()
-
+_______________________________________________________
 
 
 
@@ -503,7 +503,7 @@ plt.title('Phase Portrait with Nullclines and Sample Trajectory')
 plt.legend()
 plt.tight_layout()
 plt.show()
-
+_______________________________________________________
 
 
 
@@ -587,7 +587,7 @@ plt.title('Phase Portrait with Nullclines and Sample Trajectory')
 plt.legend()
 plt.tight_layout()
 plt.show()
-
+_______________________________________________________
 
 
 
@@ -671,7 +671,7 @@ plt.title('Phase Portrait with Nullclines and Sample Trajectory')
 plt.legend()
 plt.tight_layout()
 plt.show()
-
+_______________________________________________________
 
 
 
